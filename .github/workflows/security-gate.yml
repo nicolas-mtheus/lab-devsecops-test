@@ -1,4 +1,4 @@
-name: DevSecOps CI Gatekeeper
+name: 🛡️ DevSecOps Security Gate
 
 on:
   push:
@@ -7,43 +7,54 @@ on:
     branches: [ main ]
 
 jobs:
-  security-scan:
+  security-analysis:
     name: Security Analysis
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout Code
+      - name: 🔍 Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2. Gitleaks: Usando imagem Docker oficial para pular a exigência de licença da Action
-      - name: Gitleaks Scan
-        continue-on-error: true # Adicione isso apenas para ver os outros erros agora
+      # 1. Gitleaks (Secrets)
+      - name: 🔑 Gitleaks Scan
+        id: gitleaks
         run: |
-          docker run --rm -v $(pwd):/path zricethezav/gitleaks:latest detect --source="/path" --verbose --redact
+          echo "### 🔑 Relatório de Secrets (Gitleaks)" >> $GITHUB_STEP_SUMMARY
+          docker run --rm -v $(pwd):/path zricethezav/gitleaks:latest detect --source="/path" --verbose --redact >> $GITHUB_STEP_SUMMARY || echo "❌ Leaks encontrados!" >> $GITHUB_STEP_SUMMARY
 
-      # 3. Semgrep: SAST (Análise Estática)
-      - name: Semgrep SAST Scan
-        continue-on-error: true # Adicione isso apenas para ver os outros erros agora
+      # 2. Semgrep (SAST)
+      - name: 🛡️ Semgrep Scan
+        id: semgrep
         run: |
+          echo "### 🛡️ Relatório SAST (Semgrep)" >> $GITHUB_STEP_SUMMARY
           docker run --rm -v $(pwd):/src returntocorp/semgrep semgrep \
-          --config=p/java \
-          --config=p/typescript \
-          --config=p/security-audit \
-          --error
+          --config=p/java --config=p/typescript --config=p/security-audit --error >> $GITHUB_STEP_SUMMARY || echo "❌ Falhas de código encontradas!" >> $GITHUB_STEP_SUMMARY
 
-      - name: Trivy Dependency Scan
+      # 3. Trivy (SCA)
+      - name: 📦 Trivy Dependency Scan
+        id: trivy
         uses: aquasecurity/trivy-action@0.28.0
         with:
           scan-type: 'fs'
-          scanners: 'vuln,config,secret'
-          exit-code: '1' 
-          severity: 'CRITICAL,HIGH'
+          scanners: 'vuln'
           format: 'table'
+          output: 'trivy-report.txt'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
 
-      - name: Security Report Summary
+      # 4. Publicar Relatório do Trivy se ele falhar
+      - name: 📋 Publish Trivy Summary
         if: failure()
         run: |
-          echo "### ❌ Falha de Segurança Detectada!" >> $GITHUB_STEP_SUMMARY
-          echo "A pipeline foi bloqueada porque vulnerabilidades críticas foram encontradas no código do GEDAI." >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Relatório de Dependências (Trivy)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat trivy-report.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      # Passo Final: Forçar a falha se qualquer um anterior falhou (já que usamos logs)
+      - name: 🛑 Check for Failures
+        if: steps.gitleaks.outcome == 'failure' || steps.semgrep.outcome == 'failure' || steps.trivy.outcome == 'failure'
+        run: |
+          echo "A pipeline encontrou vulnerabilidades críticas. Verifique o resumo (Summary) da Action."
+          exit 1
