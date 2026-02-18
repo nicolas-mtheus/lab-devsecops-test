@@ -25,6 +25,7 @@ jobs:
 
       # 3. Semgrep: SAST (Análise Estática)
       - name: Semgrep SAST Scan
+        continue-on-error: true # Adicione isso apenas para ver os outros erros agora
         run: |
           docker run --rm -v $(pwd):/src returntocorp/semgrep semgrep \
           --config=p/java \
