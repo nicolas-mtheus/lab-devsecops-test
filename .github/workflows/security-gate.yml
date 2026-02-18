@@ -1,0 +1,53 @@
+name: DevSecOps CI Gatekeeper
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-scan:
+    name: Security Analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout do Código
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Necessário para o Gitleaks analisar o histórico de commits
+
+      # 2. Gitleaks: Busca segredos expostos (vai pegar aquele environment.ts)
+      - name: Gitleaks Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 3. Semgrep: SAST (Análise Estática) para Java e Angular
+      - name: Semgrep SAST Scan
+        run: |
+          # Rodando via Docker para garantir que todas as regras de Java/OWASP funcionem
+          docker run --rm -v $(pwd):/src returntocorp/semgrep semgrep \
+          --config=p/java \
+          --config=p/typescript \
+          --config=p/owasp-top-10 \
+          --error
+
+      # 4. Trivy: Escaneia dependências (vai pegar o Spring Boot antigo no pom.xml)
+      - name: Trivy Dependency Scan
+        uses: aquasecurity/trivy-action@0.28.0 # Versão estável fixada
+        with:
+          scan-type: 'fs'
+          scanners: 'vuln,config,secret' # Substitui o 'security-checks'
+          exit-code: '1' 
+          severity: 'CRITICAL,HIGH'
+          format: 'table'
+
+      # 5. Resumo no GitHub Step Summary (Aparece na página da Action se falhar)
+      - name: Security Report Summary
+        if: failure()
+        run: |
+          echo "### Falha de Segurança Detectada!" >> $GITHUB_STEP_SUMMARY
+          echo "A pipeline foi bloqueada porque vulnerabilidades críticas foram encontradas." >> $GITHUB_STEP_SUMMARY
+          echo "Verifique os logs dos passos acima (Gitleaks, Semgrep ou Trivy) para corrigir os problemas." >> $GITHUB_STEP_SUMMARY
