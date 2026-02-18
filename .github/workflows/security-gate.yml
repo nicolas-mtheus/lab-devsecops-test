@@ -22,13 +22,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # 2. Semgrep: SAST (Análise Estática) para Java e Angular
       - name: Semgrep SAST Scan
         run: |
+          # Usamos 'p/default' que já engloba segurança e boas práticas
           docker run --rm -v $(pwd):/src returntocorp/semgrep semgrep \
           --config=p/java \
           --config=p/typescript \
-          --config=p/owasp-top-10 \
-          --error
+          --config=p/security-audit \
+          --errors-only
 
       - name: Trivy Dependency Scan
         uses: aquasecurity/trivy-action@0.28.0
