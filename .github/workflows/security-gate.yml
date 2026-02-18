@@ -23,14 +23,14 @@ jobs:
         run: |
           docker run --rm -v $(pwd):/path zricethezav/gitleaks:latest detect --source="/path" --verbose --redact
 
-      # 2. Semgrep: SAST (Análise Estática) para Java e Angular
+      # 3. Semgrep: SAST (Análise Estática)
       - name: Semgrep SAST Scan
         run: |
-          docker run --rm -v $(pwd):/src returntocorp/semgrep semgrep scan \
+          docker run --rm -v $(pwd):/src returntocorp/semgrep semgrep \
           --config=p/java \
           --config=p/typescript \
           --config=p/security-audit \
-          --error-exit-code=1
+          --error
 
       - name: Trivy Dependency Scan
         uses: aquasecurity/trivy-action@0.28.0
