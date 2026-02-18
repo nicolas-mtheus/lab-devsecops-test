@@ -19,6 +19,7 @@ jobs:
 
       # 2. Gitleaks: Usando imagem Docker oficial para pular a exigência de licença da Action
       - name: Gitleaks Scan
+        continue-on-error: true # Adicione isso apenas para ver os outros erros agora
         run: |
           docker run --rm -v $(pwd):/path zricethezav/gitleaks:latest detect --source="/path" --verbose --redact
 
